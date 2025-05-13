@@ -1,6 +1,8 @@
+# equivalent output to "pwd"
 realpath .
 
-cd /root/
+# or /root/
+cd /
 
 cd /home/f/frohne
 
