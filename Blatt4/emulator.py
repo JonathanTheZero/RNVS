@@ -1,6 +1,13 @@
 import socket
 import threading
 import time
+from enum import Enum
+
+
+class ServerCode(Enum):
+    EXT = -1
+    ACK = 0
+    UNKNOWN = 1
 
 
 def server() -> None:
@@ -25,17 +32,31 @@ def server() -> None:
             while True:
                 data: bytes = connection.recv(1024)
                 if data:
-                    print("[Server] Received:", data.decode())
-                    if data.decode() == "exit":
-                        print("[Server] Shutting down...")
+                    str_data: str = data.decode()
+                    print("[Server] Received:", str_data)
+
+                    code, msg = server_parse_msg(str_data)
+                    if code == ServerCode.EXT:
+                        print("[Server] Initiating shutdown...")
                         return
-                    connection.sendall(b"Acknowledged")
+                    else:
+                        print(f"[Server] Flag: {code}, Message: {msg.decode("UTF-8")}")
+                        connection.sendall(msg)
                 else:
                     print("[Server] No more data from", print_addr(client_address))
                     break
 
         finally:
             connection.close()
+
+
+def server_parse_msg(msg: str) -> tuple[ServerCode, bytes]:
+    if msg == "exit":
+        return (ServerCode.EXT, b"")
+    if msg == "start":
+        return (ServerCode.ACK, b"Acknowledged")
+
+    return (ServerCode.UNKNOWN, b"Unknown protocol")
 
 
 def client() -> None:
@@ -45,19 +66,20 @@ def client() -> None:
     client_socket.connect(server_address)
 
     try:
-        message: bytes = b"Hello, server!"
+        message: bytes = b"start"
         print("[Client] Sending:", message)
         client_socket.sendall(message)
 
         data: bytes = client_socket.recv(1024)
         print("[Client] Received acknowledgment:", data.decode())
 
-        message = b"Received acknowledgement, sending data now..."
-        print("[Client] Sending data now...")
-        client_socket.sendall(message)
+        if data.decode() == "Acknowledged":
+            message = b"Received acknowledgement, sending data now..."
+            print("[Client] Sending data now...")
+            client_socket.sendall(message)
+            time.sleep(3)
 
     finally:
-        time.sleep(3)
         print("[Client] Closing socket, telling server to shut down")
         message: bytes = b"exit"
         client_socket.sendall(message)
